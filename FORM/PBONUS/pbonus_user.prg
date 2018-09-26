@@ -1,0 +1,98 @@
+**************************************************************************
+* PBONUS_USER.PRG - изменение прав доступа к занесению описаний бонусов от поставщиков
+* Создано: 10.02.2011
+* Последнее изменение: 01.03.2011
+* Автор: Бринк С.
+**************************************************************************
+
+* строка символов для поиска
+PUBLIC cValidString
+cValidString="abcdefghijklmnopqrstuvwxyzабвгдеёжзийклмнопрстуфхцчшщъыьэюя1234567890 '"+'!@#$%^&*()_+№;%:?*()/|\,.[]{}-=-"' 
+
+PUBLIC MySubDir
+MySubDir="PBONUS"
+
+* задаю относительные места "лежания" компонент программы
+SET PATH TO MySubDir+"\" ADDITIVE
+SET PATH TO MySubDir+"\VCL\" ADDITIVE
+SET PATH TO MySubDir+"\ICONS\" ADDITIVE
+
+* подключаю файдик со списком общих для всей проги процедур и функций
+SET PROCEDURE TO MySubDir+"\pbonus_common.prg" ADDITIVE
+*SET CLASSLIB TO MySubDir+"\VCL\SendEmail" ADDITIVE
+
+* имена и псевдонимы курсоров
+PUBLIC CursorName, CursorTmpName, CursorLockName, CursorUserName
+CursorName=fCreateCursorName('pbu')
+CursorTmpName=fCreateCursorName('_pbu')
+CursorLockName=fCreateCursorName('_lock')
+CursorUserName=fCreateCursorName('_user')
+
+* имя основной таблицы
+* используется при идентификации в функциях MyCheckRLOCK, MyRLock, MyRUnLock
+* и при удалении строк в pbonus_del.scx 
+PUBLIC MainTableName
+MainTableName="pbonus_user"
+
+* имя и код текущего пользователя
+PUBLIC M.CUser_Name, M.CUser_Code
+M.CUser_Code=gnuser						&& переменная идентификатор кода текущего пользователя из СВ, для надежности (вдруг поменяют ...) сохраняю в своей переменной
+M.CUser_Name=ALLTRIM(SUBSTR(GetUserData(M.CUser_Code,1,.F.),9))
+
+* вынимаю из файла настроек пользователей все настройки и права
+*PUBLIC pnFltPri, pnFltOtm, plFltDraft, M.CUser_Co
+*=GetUserPresets(M.CUser_Code,'USER')
+
+* команды для выборки, добавления и обновления строки в основную таблицу
+PUBLIC sqlSelectStatement, sqlLineSelectStatement, sqlInsertStatement, sqlUpdateStatement, sqlManyDeleteStatement, sqlOneDeleteStatement, sqlUnDeleteStatement
+
+sqlSelectStatement="SELECT "+MainTableName+".*, password.name FROM "+MainTableName+" "+;
+				   "LEFT JOIN password ON "+MainTableName+".upcode= password.code"
+				   
+sqlLineSelectStatement=sqlSelectStatement+" WHERE "+MainTableName+".code=?m.code"
+					 
+sqlInsertStatement="INSERT INTO "+MainTableName+;
+						  " (upcode,pbu_issb,pbu_ispb,pbu_isbt,pbu_isbu,pbu_svi,pbu_isbn,pau_isan,pau_isdz,pau_iszkd,pau_iskd,pau_ismn,pau_isco,pau_isit,"+;
+							"pau_fpri,pau_fotm,pau_fdra,pau_save,pau_save2,pau_chus,pau_ismm,deleted) "+;
+			  	   "VALUES(?m.upcode,?m.pbu_issb,?m.pbu_ispb,?m.pbu_isbt,?m.pbu_isbu,?m.pbu_svi,?m.pbu_isbn,?m.pau_isan,?m.pau_isdz,?m.pau_iszkd,"+;
+			  	   		  "?m.pau_iskd,?m.pau_ismn,?m.pau_isco,?m.pau_isit,?m.pau_fpri,?m.pau_fotm,?m.pau_fdra,?m.pau_save,?m.pau_save2,?m.pau_chus,?m.pau_ismm,?m.deleted)"
+		 	  
+sqlUpdateStatement="UPDATE "+MainTableName+" "+;
+				   "SET upcode=?m.upcode,pbu_issb=?m.pbu_issb,pbu_ispb=?m.pbu_ispb,pbu_isbt=?m.pbu_isbt,pbu_isbu=?m.pbu_isbu,pbu_svi=?m.pbu_svi,pbu_isbn=?m.pbu_isbn,"+;
+				 	 "pau_isan=?m.pau_isan,pau_isdz=?m.pau_isdz,pau_iszkd=?m.pau_iszkd,pau_iskd=?m.pau_iskd,pau_ismn=?m.pau_ismn,pau_isco=?m.pau_isco,pau_isit=?m.pau_isit,"+;
+				 	 "pau_fpri=?m.pau_fpri,pau_fotm=?m.pau_fotm,pau_fdra=?m.pau_fdra,pau_save=?m.pau_save,pau_save2=?m.pau_save2,pau_chus=?m.pau_chus,pau_ismm=?m.pau_ismm "+;
+				   "WHERE code=?m.code"
+			 	  
+sqlManyDeleteStatement="UPDATE "+MainTableName+" SET DELETED=1"
+
+sqlOneDeleteStatement=sqlManyDeleteStatement+" WHERE code=?m.code"
+
+sqlUnDeleteStatement="UPDATE "+MainTableName+" SET DELETED=0 WHERE code=?m.code"
+
+**** добавляю поля при разработке *********************************
+*=RunSQL("ALTER TABLE pbonus_user ADD pau_ismm BIT NULL", CursorName)
+*=RunSQL("ALTER TABLE pbonus_user ALTER COLUMN pau_chus BIT NULL", CursorName)
+*=RunSQL("ALTER TABLE pbonus_user ADD pau_fotm INT ", CursorName)
+*=RunSQL("ALTER TABLE pbonus_user ADD pau_fdra BIT NULL", CursorName)
+*lnRunResult = RunSQL("SELECT pbonus_user.*, password.name FROM pbonus_user LEFT JOIN password ON pbonus_user.upcode= password.code", CursorName)
+*DISPLAY STRUCTURE
+*BROWSE
+*USE
+*******************************************************************
+
+* проверяю права на доступ
+pnUserCheck=0
+pnUserCheck=CheckPBonusUser(M.CUser_Code,'PBonusUser')
+IF  pnUserCheck = 1
+	DO FORM PBU_LST.scx 	&& вызываю экранную форму
+ELSE
+	WAIT WINDOW 'У вас нет доступа в данный раздел!'	
+ENDIF	
+
+RELEASE cValidString
+RELEASE MySubDir
+RELEASE CursorName, CursorTmpName, CursorLockName, CursorUserName
+RELEASE MainTableName
+*RELEASE M.CUser_Name, M.CUser_Code
+*RELEASE pnFltPri, pnFltOtm, plFltDraft, M.CUser_Co
+RELEASE sqlSelectStatement, sqlLineSelectStatement, sqlInsertStatement, sqlUpdateStatement, sqlManyDeleteStatement, sqlOneDeleteStatement, sqlUnDeleteStatement
